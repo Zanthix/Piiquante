@@ -1,12 +1,13 @@
-const sauce = require('../models/sauce');
+const Sauce = require('../models/sauce');
 const fs = require('fs');
+const { updateOne, findByIdAndDelete } = require('../models/sauce');
 
 
 exports.createSauce = (req, res, next) => {
     const sauceObject = JSON.parse(req.body.sauce); 
     delete sauceObject._id;
     delete sauceObject._userId;
-    const sauce = new sauce({
+    const sauce = new Sauce({
         ...sauceObject,
         userId: req.auth.userId,
         imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
@@ -22,14 +23,15 @@ exports.modifySauce = (req, res, next) => {
         imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
     } : {...req.body};
 
-    delete sauceObject._userId;
+    console.log(sauceObject);
 
-    sauce.findOne({id: req.params.id})
+    Sauce.findOne({_id: req.params.id})
         .then(sauce => {
-            if(sauce.userId != req.userId){
+            console.log(sauce);
+            if(sauce.userId != req.auth.userId){
                 res.status(401).json({message: 'Non-autorisé'})
             }else{
-                sauce.updateOne({_id: req.params.id}, {...sauceObject, _id: req.params.id})
+                Sauce.updateOne({_id: req.params.id}, {...sauceObject, _id: req.params.id})
                 .then(() => res.status(200).json({message: 'Sauce modifiée'}))
                 .catch(error => res.status(401).json({error}));
             }
@@ -38,7 +40,7 @@ exports.modifySauce = (req, res, next) => {
 };
 
 exports.deleteSauce = (req, res, next) => {
-    sauce.findOne({id: req.params.id})
+    Sauce.findOne({id: req.params.id})
         .then(sauce => {
             if(sauce.userId != req.auth.userId){
                 res.status(401).json({message: 'Non-autorisé'});
@@ -55,13 +57,62 @@ exports.deleteSauce = (req, res, next) => {
 };
 
 exports.getOneSauce = (req, res, next) => {
-    sauce.findOne({_id: req.params.id})
+    Sauce.findOne({_id: req.params.id})
     .then(sauce => res.status(200).json(sauce))
     .catch(error => res.status(404).json({error}));
 };
 
 exports.getAllSauces = (req, res, next) => {
-    sauce.find()
+    Sauce.find()
     .then(sauces => res.status(200).json(sauces))
     .catch(error => res.status(400).json({error}));
 };
+
+exports.likeSauce = (req, res, next) => {
+    if(req.body.userId === undefined || req.body.like === undefined){
+        res.status(400).json({message: 'Erreur'});
+    }
+    Sauce.findOne({_id: req.params.id})
+        .then(sauce => {
+            switch(req.body.like){
+                case 1:
+                    sauce.usersLiked.push(req.body.userId);
+                    Sauce.updateOne({_id: req.params.id}, {$inc: {'likes': 1}, $set: {'usersLiked': sauce.usersLiked}})
+                    .then(sauce => res.status(200).json({message: 'Avis ajouté !'}))
+                    .catch(error => res.status(400).json({error}));  
+                    break;
+                case -1:
+                    sauce.usersDisliked.push(req.body.userId);
+                    Sauce.updateOne({_id: req.params.id}, {$inc: {'dislikes': 1}, $set: {'usersDisliked': sauce.usersDisliked}})
+                    .then(sauce => res.status(200).json({message: 'Avis ajouté !'}))
+                    .catch(error => res.status(400).json({error}));  
+                    break;
+                case 0:
+                    const id = req.body.userId;
+                    let index = 0;   
+                    for(let item of sauce.usersLiked){
+                        if(item === id){
+                            sauce.usersLiked.splice(index, 1);
+                            Sauce.updateOne({_id: req.params.id}, {$inc: {'likes': -1}, $set:{'usersLiked': sauce.usersLiked}})
+                            .then(sauce => res.status(200).json({message: 'Avis retiré !'}))
+                            .catch(error => res.status(400).json({error}));
+                            break;
+                        }
+                        index++;
+                    }
+                    index = 0;
+                    for(let item of sauce.usersDisliked){
+                        if(item === id){
+                            sauce.usersDisliked.splice(index, 1);
+                            Sauce.updateOne({_id: req.params.id}, {$inc: {'dislikes': -1}, $set:{'usersDisliked': sauce.usersDisliked}})
+                            .then(sauce => res.status(200).json({message: 'Avis retiré !'}))
+                            .catch(error => res.status(400).json({error}));
+                            break;
+                        }
+                        index++;
+                    }
+                    break;
+            }
+        })
+        .catch(error => res.status(404).json({error}));
+}

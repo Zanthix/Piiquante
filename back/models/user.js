@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const MongooseErrors = require('mongoose-errors')
 const uniqueValidator = require('mongoose-unique-validator');
 
 const userSchema = mongoose.Schema({
@@ -8,5 +9,6 @@ const userSchema = mongoose.Schema({
 
 //permet que chaque email soit utilisable une seule fois
 userSchema.plugin(uniqueValidator);
+userSchema.plugin(MongooseErrors);
 
-module.exports = mongoose.model('user', userSchema);
+module.exports = mongoose.model('User', userSchema);

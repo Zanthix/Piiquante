@@ -1,26 +1,28 @@
+require('dotenv').config();
+
 const bcrypt = require('bcrypt');
 const jsonWebToken = require('jsonwebtoken');
 
-const user = require('../models/user');
+const User = require('../models/user');
 
 
 exports.signup = (req, res, next) => {
     bcrypt.hash(req.body.password, 10)
     .then(hash => {
-        const user = new user({
+        const user = new User({
             email: req.body.email,
             password: hash
         });
         user.save()
             .then(() => res.status(201).json({ message: 'Utilisateur créé !'}))
-            .catch(error => res.status(400).json({error}))
+            .catch(error => res.status(400).json({error}));
     })
     .catch(error => res.status(500).json({error}));
 };
 
 
 exports.login = (req, res, next) => {
-    user.findOne({email: req.body.email})
+    User.findOne({email: req.body.email})
     .then(user => {
         if(user === null){
             res.status(401).json({message: "L'identifiant ou le mot de passe est incorrect."})
@@ -34,7 +36,7 @@ exports.login = (req, res, next) => {
                         userId: user._id,
                         token: jsonWebToken.sign(
                             {userId: user._id},
-                            'RANDOM_TOKEN_SECRET',
+                            process.env.JWT_RANDOM_TOKEN_SECRET,
                             {expiresIn: '24h'}
                         )
                     });
